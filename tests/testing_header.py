@@ -35,7 +35,6 @@ This file is adapted from LaTeX2AI (https://github.com/stoani89/LaTeX2AI).
 
 # Import python modules.
 import os
-import unittest
 import subprocess
 
 
@@ -140,19 +139,9 @@ def check_license():
     return wrong_headers
 
 
-class TestHeaders(unittest.TestCase):
-    """This class tests the headers in the repository."""
+def test_headers():
+    """Check if all headers are correct."""
 
-    def test_headers(self):
-        """
-        Check if all headers are correct.
-        """
-
-        wrong_headers = check_license()
-        wrong_headers_string = "Wrong headers in: " + ", ".join(wrong_headers)
-        self.assertTrue(len(wrong_headers) == 0, wrong_headers_string)
-
-
-if __name__ == "__main__":
-    # Execution part of script.
-    unittest.main()
+    wrong_headers = check_license()
+    wrong_headers_string = "Wrong headers in: " + ", ".join(wrong_headers)
+    assert len(wrong_headers) == 0, wrong_headers_string
