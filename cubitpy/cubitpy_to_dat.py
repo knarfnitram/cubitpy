@@ -83,7 +83,7 @@ def add_node_sets(dat_lines, cubit, exo):
         if geo is cupy.geometry.vertex:
             geo_string = "DPOINT"
         elif geo is cupy.geometry.curve:
-            geo_string = "DCURVE"
+            geo_string = "DLINE"
         elif geo is cupy.geometry.surface:
             geo_string = "DSURF"
         elif geo is cupy.geometry.volume:

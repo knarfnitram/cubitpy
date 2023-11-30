@@ -6,7 +6,7 @@ DPOINT 1
 // vertex
 E 1 - NUMDOF 3 ONOFF 1 1 1 VAL 0 0 0 FUNCT 0 0 1
 ----------------------------------------DESIGN LINE NEUMANN CONDITIONS
-DCURVE 1
+DLINE 1
 // curve
 E 1 - NUMDOF 3 ONOFF 1 1 1 VAL 0 0 0 FUNCT 0 0 2
 ----------------------------------------DESIGN SURF DIRICH CONDITIONS
