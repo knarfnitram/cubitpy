@@ -281,7 +281,7 @@ class CubitGroup(object):
         self_geometry = self.get_geometry_type()
         if (
             self_geometry != cupy.geometry.surface
-            and self_geometry != cupy.geometry.volume
+            and self_geometry != cupy.geometry.volume and self_geometry != cupy.geometry.curve
         ):
             raise NotImplementedError("This case is not implemented")
 

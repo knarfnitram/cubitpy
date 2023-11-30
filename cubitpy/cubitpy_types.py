@@ -121,7 +121,7 @@ class CubitItems(Enum):
 
 class ElementType(Enum):
     """Enum for finite element shape types."""
-
+    bar2 = auto()
     hex8 = auto()
     hex20 = auto()
     hex27 = auto()
@@ -130,6 +130,7 @@ class ElementType(Enum):
     hex8sh = auto()
     hex8_fluid = auto()
     quad4 = auto()
+    tet4_fluid = auto()
 
     def get_cubit_names(self):
         """
@@ -138,7 +139,7 @@ class ElementType(Enum):
         """
 
         # Get the element type parameters.
-        if self == self.hex8 or self == self.hex8sh or self == self.hex8_fluid:
+        if self == self.hex8 or self == self.hex8sh or self == self.hex8_fluid or self == self.tet4_fluid:
             cubit_scheme = "Auto"
             cubit_element_type = "HEX8"
         elif self == self.hex20:
@@ -156,6 +157,9 @@ class ElementType(Enum):
         elif self == self.quad4:
             cubit_scheme = "Auto"
             cubit_element_type = "QUAD4"
+        elif self == self.bar2:
+            cubit_scheme = "equal"
+            cubit_element_type = "BAR2"
         else:
             raise ValueError("Got wrong element type {}!".format(self))
 
@@ -177,17 +181,21 @@ class ElementType(Enum):
             return "SOLIDT10"
         elif self == self.hex8sh:
             return "SOLIDSH8"
+        elif self == self.tet4_fluid:
+            return "FLUID"
         elif self == self.hex8_fluid:
             return "FLUID"
         if self == self.quad4:
             return "WALL"
+        elif self == self.bar2:
+            return "ART"
         else:
             raise ValueError("Got wrong element type {}!".format(self))
 
     def get_baci_section(self):
         """Get the correct section name of this element in baci."""
-
-        if self == self.hex8_fluid:
+        
+        if self == self.hex8_fluid or self==self.tet4_fluid:
             return "FLUID"
         elif (
             self == self.hex20
@@ -200,6 +208,10 @@ class ElementType(Enum):
             or self == self.quad4
         ):
             return "STRUCTURE"
+        elif(
+            self == self.bar2
+        ):
+            return "ARTERY"
         else:
             raise ValueError("Got wrong element type {}!".format(self))
 
@@ -218,6 +230,8 @@ class ElementType(Enum):
             return "TET10"
         elif self == self.quad4:
             return "QUAD4"
+        elif self == self.bar2:
+            return "LINE2"
         else:
             raise ValueError("Got wrong element type {}!".format(self))
 
@@ -257,6 +271,17 @@ class BoundaryConditionType(Enum):
     solid_to_solid_surface_contact = auto()
     fsi_coupling = auto()
     ale_dirichlet = auto()
+    fluid_stress_calc = auto()
+    fluid_neuman_inflow = auto()
+    fluid_impedance = auto()
+    fluid_volumetric_flow =  auto()
+    fluid_volumetric_flow_border = auto ()
+    artery_1D_inflow =  auto()
+    artery_1D_junction =  auto()
+    artery_1D_in_out = auto()
+    artery_1D_reflective = auto()
+    artery_1D_network_plot = auto()
+
 
     def get_dat_bc_section_header(self, geometry_type):
         """
@@ -308,6 +333,37 @@ class BoundaryConditionType(Enum):
             or geometry_type == FiniteElementObject.node
         ):
             return "DESIGN SURF ALE DIRICH CONDITIONS"
+        elif self == self.fluid_stress_calc and (
+            geometry_type == GeometryType.surface
+        ):
+            return "DESIGN FLUID STRESS CALC SURF CONDITIONS"
+        elif self == self.fluid_neuman_inflow and (
+            geometry_type == GeometryType.surface
+        ):
+            return "FLUID NEUMANN INFLOW SURF CONDITIONS"
+        elif self == self.fluid_impedance and (
+            geometry_type == GeometryType.surface
+        ):
+            return "DESIGN SURF IMPEDANCE CONDITIONS"
+        elif self == self.fluid_volumetric_flow and (
+            geometry_type == GeometryType.surface
+        ):
+            return "DESIGN SURF VOLUMETRIC FLOW CONDITIONS"
+        elif self == self.fluid_volumetric_flow_border and (
+            geometry_type == GeometryType.curve
+        ):
+            return "DESIGN LINE VOLUMETRIC FLOW BORDER NODES"
+        elif self ==self.artery_1D_junction and (geometry_type == GeometryType.vertex):
+            return "DESIGN NODE 1D ARTERY JUNCTION CONDITIONS"
+        elif self ==self.artery_1D_inflow and (geometry_type == GeometryType.vertex):
+            return "DESIGN NODE 1D ARTERY PRESCRIBED CONDITIONS"
+        elif self ==self.artery_1D_in_out and (geometry_type == GeometryType.vertex):
+            return "DESIGN NODE 1D ARTERY IN_OUTLET CONDITIONS"#
+        elif self ==self.artery_1D_reflective and (geometry_type == GeometryType.vertex):
+            return "DESIGN NODE 1D ARTERY REFLECTIVE CONDITIONS"
+        elif self ==self.artery_1D_network_plot and (geometry_type == GeometryType.curve):
+            return "DESIGN LINE EXPORT 1D-ARTERIAL NETWORK GNUPLOT FORMAT"
+        
         else:
             raise ValueError(
                 "No implemented case for {} and {}!".format(self, geometry_type)
