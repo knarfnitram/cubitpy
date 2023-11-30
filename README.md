@@ -58,5 +58,5 @@ export BACI_PRE_EXODUS=path_to_pre-exodus
 To check if everything worked as expected, run the tests from within the `tests` directory
 ```bash
 cd path_to_cubitpy/tests
-python testing.py
+pytest -q testing.py 
 ```
