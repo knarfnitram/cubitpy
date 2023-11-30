@@ -1,0 +1,9 @@
+## cubit
+## Cubit Version 15.2
+## Cubit Build 407078
+## Revised 2017-02-24 09:23:31 -0700 (Fri, 24 Feb 2017)
+## Running 04/04/2023 11:43:18 AM
+## Command Options:
+reset
+set geometry engine acis
+import fluent mesh geometry "/home/a11bmafr/software/vmtk/vmtk2baci/049/Case_cut_49_fluid.msh" feature_angle 135

@@ -128,6 +128,7 @@ def create_brick(
     return solid
 
 
+
 def extrude_mesh_normal_to_surface(
     cubit, surfaces, thickness, n_layer=2, offset=[0, 0, 0], extrude_dir="outside"
 ):
@@ -251,6 +252,156 @@ def extrude_mesh_normal_to_surface(
     ball_hex_ids = range(n_elements_old + 1, n_elements_old + n_quads * n_layer + 1)
     cubit.cmd(
         "create mesh geometry hex {} feature_angle 135.0".format(
+            " ".join(map(str, ball_hex_ids))
+        )
+    )
+    last_id = cubit.get_entities(cupy.geometry.volume)[-1]
+    return cubit.volume(last_id)
+
+
+
+def extrude_mesh_normal_to_tri_surface(
+    cubit, surfaces, thickness, n_layer=2, offset=[0, 0, 0], extrude_dir="outside"
+):
+    """
+    Extrude multiple meshed surfaces in normal direction of the surfaces.
+
+    Args
+    ----
+    cubit: CubitPy
+        Cubit object.
+    surfaces: [CubitSurface]
+        List of cubit surfaces that should be extruded. Each surface must be
+        meshed.
+    thickness: float
+        Thickness of the extruded layer.
+    n_layer: int
+        Number of layers.
+    offset: [x, y, z]
+        Constant translational offset to be applied to the mesh.
+    extrude_dir: 'outside', 'inside', 'symmetric'
+        Direction of the extrusion.
+    feature_angle: float
+        Feature angle of the created volume.
+    ----
+    return: [CubitVolume]
+        Return a volume created from the combined elements created in this
+        function.
+    """
+
+    # Calculate the offset depending on the extrude direction. The algorithm
+    # always extrudes outside.
+    if extrude_dir == "outside":
+        extrude_offset = 0.0
+    elif extrude_dir == "inside":
+        extrude_offset = -thickness
+    elif extrude_dir == "symmetric":
+        extrude_offset = -0.5 * thickness
+    else:
+        raise ValueError("Got wrong extrude_type!")
+
+    # Get a dictionary of all nodes on the surfaces, their positions and their
+    # normals.
+    quads = []
+    tris = []
+    node_id_pos_normal_map = {}
+    
+    for surface in surfaces:
+
+        # Get all quad elements on the surface.
+        surface_quads = cubit.get_surface_tris(surface.id())
+        quads.extend(surface_quads)
+
+        # Get all the tri elements
+       # surface_tri = cubit.get_surface_tris(surface.id())
+       # tris.extend(surface_quads)
+        surface_nodes = []
+        for quad in surface_quads:
+            # Get all nodes on this face element.
+            surface_nodes.extend(cubit.get_connectivity("tri", quad))
+        # Remove double entries in node list.
+        surface_nodes = list(set(surface_nodes))
+        if len(surface_nodes) == 0:
+            raise ValueError("Each surface must be meshed!")
+
+        # Get normals and positions of the nodes.
+        for node_id in surface_nodes:
+            my_coordinates = np.array(cubit.get_nodal_coordinates(node_id))
+            my_normal = np.array(surface.normal_at(my_coordinates))
+            if node_id in node_id_pos_normal_map.keys():
+                # Check that the normal and position are equal.
+                other_coordinates = node_id_pos_normal_map[node_id][0]
+                other_normal = node_id_pos_normal_map[node_id][1]
+                if (
+                    np.linalg.norm(my_coordinates - other_coordinates) > 1e-10
+                    or (np.linalg.norm(my_normal - other_normal)) > 1e-10
+                ):
+                    raise ValueError("Positions or normals do not match!")
+            else:
+                node_id_pos_normal_map[node_id] = [my_coordinates, my_normal]
+    
+    # Get a sorted list of the nodes on the surfaces.
+    node_ids = list(node_id_pos_normal_map.keys())
+    node_ids.sort()
+
+    # Create the new nodal coordinates.
+    n_nodes = len(node_ids)
+
+    node_id_map = {}
+    new_nodes = np.zeros([(n_layer + 1) * n_nodes, 3])
+    for i_node, node_id in enumerate(node_ids):
+        node_id_map[node_id] = i_node
+        position = node_id_pos_normal_map[node_id][0]
+        normal = node_id_pos_normal_map[node_id][1]
+        for i_layer in range(n_layer + 1):
+            new_nodes[n_nodes * i_layer + i_node, :] = (
+                offset
+                + position
+                + normal * (extrude_offset + thickness * i_layer / n_layer)
+            )
+    mi = cubit.MeshImport()
+    new_node_id = mi.add_nodes(
+        3, (n_layer + 1) * n_nodes, new_nodes.reshape([(n_layer + 1) * n_nodes * 3])
+    )
+    if not new_node_id == 0:
+        raise ValueError("Should not happen!")
+
+    # Get hex topology.
+    n_quads = len(quads)
+    element_topology = np.zeros([n_quads * n_layer, 6])
+    for i_quad, quad in enumerate(quads):
+        quad_nodes = cubit.get_connectivity("tri", quad)
+        quad_new_node_ids = [node_id_map[node] for node in quad_nodes]
+
+        for i_layer in range(n_layer):
+            element_topology[i_layer * n_quads + i_quad, :3] = np.add(
+                quad_new_node_ids, i_layer * n_nodes + 1
+            )
+            element_topology[i_layer * n_quads + i_quad, 3:] = np.add(
+                quad_new_node_ids, (i_layer + 1) * n_nodes + 1
+            )
+
+
+# the problem starts here, we can create the elements and import than to cubit
+# but i have not found a way to create a volume of it.
+# for bricks it works, for wedges not
+# damit verbunden sind auch troubles, weil man dann auf das volumen nicht zugreifen kann
+
+    # Create the elements.
+    n_elements_old = cubit.get_tri_count()
+    topology_list = list(map(int, element_topology.reshape(n_quads * n_layer * 6)))
+    print(topology_list)
+    startid=mi.add_elements(cubit.WEDGE, n_quads * n_layer, topology_list)
+    mi.create_block(3,10)
+    print(startid)
+    mi.add_elements_to_block(num,startid,n_elements_old+1 +n_quads * n_layer)
+    
+    #Create a volume from the created elements and return a reference to that
+    #volume.
+
+    ball_hex_ids = range(n_elements_old + 1, n_elements_old + n_quads * n_layer + 1)
+    cubit.cmd(
+        "create mesh geometry Element {} feature_angle 135.0".format(
             " ".join(map(str, ball_hex_ids))
         )
     )
