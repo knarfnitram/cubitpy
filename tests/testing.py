@@ -691,6 +691,97 @@ def test_contact_condition_surface_to_surface(kwargs):
     compare(cubit, **kwargs)
 
 
+def setup_small_meshed_artery_network(cubit):
+
+    node_coordinates = [
+        np.array([0.0, 0.0, 0.0]),
+        np.array([1.0, 0.0, 0.0]),
+        np.array([2.0, 1.0, 0.0]),
+        np.array([2.0, -1.0, 0.0]),
+    ]
+
+    edges = [(1, 2), (2, 3), (2, 4)]
+    for node in node_coordinates:
+        cubit.create_vertex(*node)
+
+    for edge_idx, edge in enumerate(edges):
+        curve = cubit.create_curve(cubit.vertex(edge[0]), cubit.vertex(edge[1]))
+
+    # Mesh every artery line with 1 element
+    cubit.cmd("curve 1 to {} interval 2".format(max(cubit.get_entities("curve"))))
+    cubit.cmd("curve 1 to {} scheme equal".format(max(cubit.get_entities("curve"))))
+    cubit.cmd("mesh curve 1 to {}".format(max(cubit.get_entities("curve"))))
+
+
+@pytest.mark.parametrize(*get_pre_processor_decorator(True, False))
+def test_element_type_artery(kwargs):
+    """Test mini artery network curently only working with cubitpy"""
+
+    cubit = CubitPy()
+
+    artery = setup_small_meshed_artery_network(cubit)
+
+    # Add 1D Element type
+    cubit.add_element_type(
+        cubit.group(add_value="add curve all"),
+        cupy.element_type.bar2,
+        name="ARTERY",
+        material="MAT 3 GP 5 TYPE LinExp DIAM 1",
+        bc_description="",
+    )
+
+    inflow_id = 1
+    # Test inflow boundary condtion
+    cubit.add_node_set(
+        cubit.vertex(inflow_id),
+        name="Inflow {}".format(inflow_id),
+        bc_type=cupy.bc_type.artery_1D_inflow,
+        bc_description=" flow forced 1.0 0.0 1 2",
+    )
+
+    inlet_ids = [1, 5, 6]
+    # define a inlet artery
+    for inlet_id in inlet_ids:
+        cubit.add_node_set(
+            cubit.group(add_value="add vertex {}".format(inlet_id)),
+            name="Inlet",
+            bc_type=cupy.bc_type.artery_1D_in_out,
+            bc_description="inlet",
+        )
+
+    outlet_ids = [2, 3, 4]
+    #define the outlets of an artery
+    for outlet_id in outlet_ids:
+        cubit.add_node_set(
+            cubit.group(add_value="add vertex {}".format(outlet_id)),
+            name="Outlet",
+            bc_type=cupy.bc_type.artery_1D_in_out,
+            bc_description="outlet",
+        )
+
+    # define nodes for a junction
+    junction_vertices = [2, 5, 6]
+    for vertex in junction_vertices:
+        cubit.add_node_set(
+            cubit.group(add_value="add vertex {}".format(vertex)),
+            name="Artery junction {}".format(vertex),
+            bc_type=cupy.bc_type.artery_1D_junction,
+            bc_description="{} {}".format(1, 1.0),
+        )
+    
+    # add outflow boundary contions
+    outflow = [3, 4]
+    for vertex in outflow:
+        cubit.add_node_set(
+            cubit.group(add_value="add vertex {} ".format(vertex)),
+            name="Reflective outflow",
+            bc_type=cupy.bc_type.artery_1D_reflective,
+            bc_description="0.0 none",
+        )
+
+    compare(cubit, **kwargs)
+
+
 @pytest.mark.parametrize(*get_pre_processor_decorator(True, True))
 def test_element_type_tet_fluid(kwargs):
     """Test creation of tet4 fluid elements"""
