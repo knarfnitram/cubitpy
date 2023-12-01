@@ -128,6 +128,77 @@ def create_brick(
     return solid
 
 
+def create_cylinder(
+    cubit,
+    h,
+    r,
+    *,
+    element_type=None,
+    mesh_interval=None,
+    mesh_factor=None,
+    mesh=True,
+    **kwargs
+):
+    """
+    Create a clyinder with radius and height in cubit.
+
+    Args
+    ----
+    cubit: CubitPy
+        CubitPy object.
+    h: float -   height of the cylinder
+    r: [r1, r2, r3]
+            r1	radius in the x direction
+            r2	radius in the y direction
+            r3	used to adjust the top. If set to 0, will produce a cone. If set to the larger of r1 or r2 it will create a straight cylinder.
+    element_type: cubit.ElementType
+        Type of the created element (HEX8, HEX20, HEX27, ...)
+    mesh_interval: [int, int, int]
+        Number of elements in each direction. This option is mutually
+        exclusive with mesh_factor.
+    mesh_interval: int
+        Meshing factor in cubit. 10 is the largest. This option is mutually
+        exclusive with mesh_factor.
+    mesh: bool
+        If the cube will be meshed or not.
+    kwargs:
+        Are passed to the Cubit.add_element_type function.
+    """
+
+    # Check if default value has to be set for element_type.
+    if element_type is None:
+        element_type = cupy.element_type.hex8
+
+    if len(r) != 3:
+        raise ValueError("Can you please provide a list containing 3 input radius?")
+
+    # Check the input parameters.
+    if (r[0] < 0) or (r[1] < 0) or (r[2] < 0) or (h < 0):
+        raise ValueError("Only positive lengths are possible!")
+
+    if mesh_interval is not None and mesh_factor is not None:
+        raise ValueError(
+            "The keywords mesh_interval and mesh_factor are mutually exclusive!"
+        )
+
+    # Create the block in cubit.
+    cylinder = cubit.cylinder(h, r[0], r[1], r[2])
+
+    # Set the element type.
+    cubit.add_element_type(cylinder.volumes()[0], el_type=element_type, **kwargs)
+    volume_id = cylinder.volumes()[0].id()
+
+    if mesh_factor is not None:
+        # Set a cubit factor for the mesh size.
+        cubit.cmd("volume {} size auto factor {}".format(volume_id, mesh_factor))
+
+    # Mesh the created block.
+    if mesh:
+        cubit.cmd("mesh volume {}".format(volume_id))
+
+    return cylinder
+
+
 def extrude_mesh_normal_to_surface(
     cubit, surfaces, thickness, n_layer=2, offset=[0, 0, 0], extrude_dir="outside"
 ):

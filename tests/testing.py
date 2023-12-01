@@ -45,7 +45,11 @@ testing_external_geometry = os.path.join(testing_path, "external-geometry")
 
 # CubitPy imports.
 from cubitpy import CubitPy, cupy, get_surface_center
-from cubitpy.mesh_creation_functions import create_brick, extrude_mesh_normal_to_surface
+from cubitpy.mesh_creation_functions import (
+    create_brick,
+    extrude_mesh_normal_to_surface,
+    create_cylinder,
+)
 from cubitpy.geometry_creation_functions import create_parametric_surface
 from cubitpy.cubit_utility import import_fluent_geometry
 
@@ -688,12 +692,115 @@ def test_contact_condition_surface_to_surface(kwargs):
 
 
 @pytest.mark.parametrize(*get_pre_processor_decorator(True, True))
+def test_element_type_tet_fluid(kwargs):
+    """Test creation of tet4 fluid elements"""
+
+    cubit = CubitPy()
+
+    fluid = create_brick(
+        cubit,
+        1,
+        1,
+        1,
+        mesh_interval=[1, 1, 1],
+        element_type=cupy.element_type.tet4_fluid,
+    )
+
+    # Compare the input file created for baci.
+    compare(cubit, **kwargs)
+
+
+@pytest.mark.parametrize(*get_pre_processor_decorator(True, True))
+def test_fluid_boundary_conditions(kwargs):
+    """Test fluid several boundary conditions"""
+
+    cubit = CubitPy()
+
+    # Create fluid meshes
+    fluid = create_cylinder(
+        cubit, 2, [1, 1, 1], mesh_factor=10, element_type=cupy.element_type.tet4_fluid
+    )
+    # cubit.display_in_cubit()
+
+    # fix ids of geometric entitys
+    wall_surf_id = 1
+    inflow_surf_id = 3
+    outflow_surf_id = 2
+
+    inflow_curve_id = 2
+    outflow_curve_id = 1
+
+    # apply no slip fluid velocity condition on wall
+    cubit.add_node_set(
+        cubit.surface(wall_surf_id),
+        name="Arterial Wall - no slip",
+        bc_type=cupy.bc_type.dirichlet,
+        bc_description="NUMDOF 4 ONOFF 1 1 1 0 VAL 0.0 0.0 0.0 0.0 FUNCT 0 0 0 0 ",
+    )
+
+    # apply fluid stress calculation on wall
+    cubit.add_node_set(
+        cubit.surface(wall_surf_id),
+        name="Arterial Wall - stress",
+        bc_type=cupy.bc_type.fluid_stress_calc,
+        bc_description=" ",
+    )
+
+    # add outflow stabilization boundary condition on outflow
+    cubit.add_node_set(
+        cubit.surface(outflow_surf_id),
+        name="Neuman Stabilization Outflow {}".format(outflow_surf_id),
+        bc_type=cupy.bc_type.fluid_neuman_inflow,
+        bc_description=" ",
+    )
+
+    # add windkessel condtion on outflow
+    cubit.add_node_set(
+        cubit.surface(outflow_surf_id),
+        name="Impedance {}".format(outflow_surf_id),
+        bc_type=cupy.bc_type.fluid_impedance,
+        bc_description="{} windkessel R1 {} R2 {} C {} TIMEPERIOD {} FUNCT {}".format(
+            1, 2, 3, 0.2, 1.0, -1
+        ),
+    )
+
+    # add volumetric inflow condition
+    cubit.add_node_set(
+        cubit.surface(inflow_surf_id),
+        name="Fluid Volumetric Flow {}".format(inflow_surf_id),
+        bc_type=cupy.bc_type.fluid_volumetric_flow,
+        bc_description="{} POLYNOMIAL PREBIASED InFlow WithCorrection Period 1.0 Order 2 Harmonics 5 Val 1000.0 Funct 2 SelfEvaluateNormal 0.0 0.0 0.0 SelfEvaluateCenterOfMass 0.0 0.0 0.0".format(
+            inflow_surf_id
+        ),
+    )
+
+    # add volumetric border nodes
+    cubit.add_node_set(
+        cubit.curve(inflow_curve_id),
+        name="Fluid Volumetric Flow Border {}".format(inflow_curve_id),
+        bc_type=cupy.bc_type.fluid_volumetric_flow_border,
+        bc_description="{}".format(inflow_curve_id),
+    )
+
+    # add line dirich condition on border nodes
+    cubit.add_node_set(
+        cubit.curve(inflow_curve_id),
+        name="Line dirich {}".format(inflow_curve_id),
+        bc_type=cupy.bc_type.dirichlet,
+        bc_description="NUMDOF 4 ONOFF 1 1 1 0 VAL 0.0 0.0 0.0 0.0 FUNCT 0 0 0 0",
+    )
+
+    # Compare the input file created for baci.
+    compare(cubit, **kwargs)
+
+
+@pytest.mark.parametrize(*get_pre_processor_decorator(True, True))
 def test_fsi_functionality(kwargs):
     """Test fsi and ale conditions and fluid mesh creation"""
 
     cubit = CubitPy()
 
-    # Create solif and fluid meshes
+    # Create solid and fluid meshes
     solid = create_brick(cubit, 1, 1, 1, mesh_interval=[1, 1, 1])
     fluid = create_brick(
         cubit,
