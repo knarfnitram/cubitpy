@@ -29,6 +29,7 @@ from cubitpy_tutorial import cubit_step_by_step_tutorial_cli
 from test_cubitpy import compare, testing_temp
 
 from cubitpy import CubitPy
+from tutorial.tutorial import cubit_step_by_step_tutorial_cli
 
 
 class TestTutorial(unittest.TestCase):
