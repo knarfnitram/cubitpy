@@ -1702,3 +1702,47 @@ def test_extrude_artery_of_aneurysm():
     assert 13.570135865871498 == pytest.approx(
         cubit.get_meshed_volume_or_area("volume", [volume.id()]), 1e-5
     )
+
+def test_bc_from_node():
+    """Creates a boundary condition based on node id."""
+
+    # create cubit
+    cubit = CubitPy()
+
+    # create brick with 4 elements
+    cubit.brick(1, 1, 1)
+    cubit.cmd("surface 1 interval 1 ")
+    cubit.cmd("surface 3 interval 1 ")
+    cubit.cmd("mesh volume 1")
+    cubit.add_element_type(cubit.group(add_value="add volume 1"), cupy.element_type.hex8)
+
+    # get node count
+    num_nodes = cubit.get_node_count()
+    node_ids = list(range(1, num_nodes + 1))
+
+    # create new group
+    group_segment=cubit.group()
+
+    # find specific node from mesh and add it to group
+    for node_id in node_ids:
+        x, y, z = cubit.get_nodal_coordinates(node_id)
+        if np.isclose(x,0, atol=1e-2) and np.isclose(y,0, atol=1e-2) and np.isclose(z,0.5, atol=1e-2):
+            group_segment.add(add_value=f"add node {node_id}")
+
+    # add nodeset based on node id
+    cubit.add_node_set(
+        group_segment,
+        name="test node",
+        bc_type=cupy.bc_type.dirichlet,
+        bc_description={
+            "NUMDOF": 3,
+            "ONOFF": [1, 1, 1],
+            "VAL": [0, 0, 0],
+            "FUNCT": [0, 0, 0],
+        },
+    )
+
+    # compare results
+    out_file = os.path.join(testing_temp, "tmp" + ".4C.yaml")
+    cubit.dump(out_file)
+    compare_yaml(cubit)
